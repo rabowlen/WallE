@@ -26,6 +26,11 @@ import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.robotcore.external.ClassFactory;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer;
+import org.firstinspires.ftc.robotcore.external.navigation.VuforiaLocalizer.CameraDirection;
+import org.firstinspires.ftc.robotcore.external.tfod.TFObjectDetector;
+import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
 
 /**
  * This file contains an minimal example of a Linear "OpMode". An OpMode is a 'program' that runs in either
@@ -41,11 +46,25 @@ import com.qualcomm.robotcore.util.ElapsedTime;
  */
 
 public class AutoMethods {
-    
+    //getting key
+    private static final String VUFORIA_KEY = "AQsvu/X/////AAADmZ2+bLYDyEwvo4napGAaVU2GVRdiApNTAWxeYlOxYQ2s1/zuMOm0x5QjHI5KoJtrMugyZFnpdue8xQvjC5pEMxmra/P1r+uDsf8G990OEvI3vkv9KNZt2FbPdIZFcruplfyiLGZM61hzLTXhBQ5EiSQI00ZdQw52l4EJhlJ3tLvmp9QYxhYHjKu2lfiqBDcTKzdOIFfEmCR2TkLqvLKs+g4/xi2G+cRXx9GlQT3bKkkR3QGbLeSNJn3dJ2QuMHwCJZFAomEh3hyiaxp4umc8zDTUpzNUQBWIVqH6jL/4T9+MgWz9FQzTMinE/2b+twF/e6ujZvRrU6GssxLN2nl1+wF+h+FcfxJqc7sNDJL85j/3";
+    //creating future variables for vuforia
+    private TFObjectDetector tfod;
+    private VuforiaLocalizer vuforia;
+    private static final String TFOD_MODEL_ASSET = "RoverRuckus.tflite";
+    private static final String LABEL_GOLD_MINERAL = "Gold Mineral";
+    private static final String LABEL_SILVER_MINERAL = "Silver Mineral";
+
     public DcMotor motorLeft;
     public DcMotor motorRight;
     public DcMotor motorArm;
     public Servo servoMarker;
+    
+    //create the hardware map for tfod
+    walle.motorLeft  = hardwareMap.get(DcMotor.class, "motorLeft");
+    walle.motorRight = hardwareMap.get(DcMotor.class, "motorRight");
+    walle.motorArm  = hardwareMap.get(DcMotor.class, "motorArm");
+    walle.servoMarker = hardwareMap.get(Servo.class, "servoMarker");
     
     
     public void walleDown(){
@@ -162,12 +181,56 @@ public class AutoMethods {
         
     }
     
-    public void armStop() {
-        motorArm.setPower(0);
+    public void checkMineral() {
+        
+         initVuforia();
+
+        if (ClassFactory.getInstance().canCreateTFObjectDetector()) {
+            initTfod();
+        }
+        tfod.activate();
+        List<Recognition> updatedRecognitions = tfod.getUpdatedRecognitions();
+        
+        for (Recognition recognition : updatedRecognitions){
+        if (recognition.getLabel().equals(LABEL_GOLD_MINERAL)){
+        motorLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        motorRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        int revolution = 1440;
+          
+        motorLeft.setTargetPosition((int)(revolution * revs));    
+        motorRight.setTargetPosition((int)(-revolution * revs));
+        motorLeft.setPower(1);
+        motorRight.setPower(1);
+        motorLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        motorRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        
+        while(motorLeft.isBusy() && motorRight.isBusy()) {}   
+        
+        motorLeft.setPower(0);
+        motorRight.setPower(0);
+        }
+    }
+    }
+        private void initVuforia() {
+        /*
+         * Configure Vuforia by creating a Parameter object, and passing it to the Vuforia engine.
+         */
+        VuforiaLocalizer.Parameters parameters = new VuforiaLocalizer.Parameters();
+
+        parameters.vuforiaLicenseKey = VUFORIA_KEY;
+        parameters.cameraDirection = CameraDirection.BACK;
+
+        //  Instantiate the Vuforia engine
+        vuforia = ClassFactory.getInstance().createVuforia(parameters);
+
+        // Loading trackables is not necessary for the Tensor Flow Object Detection engine.
+    }
+        private void initTfod() {
+        int tfodMonitorViewId = hardwareMap.appContext.getResources().getIdentifier(
+            "tfodMonitorViewId", "id", hardwareMap.appContext.getPackageName());
+        TFObjectDetector.Parameters tfodParameters = new TFObjectDetector.Parameters(tfodMonitorViewId);
+        tfod = ClassFactory.getInstance().createTFObjectDetector(tfodParameters, vuforia);
+        tfod.loadModelFromAsset(TFOD_MODEL_ASSET, LABEL_GOLD_MINERAL, LABEL_SILVER_MINERAL);
     }
     
-    public void superForward() {
-        motorLeft.setPower(.90);
-        motorRight.setPower(-.90);
-    }
 }
